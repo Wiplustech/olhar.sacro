@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olhar Sacro</title>
+    <!-- Tailwind CSS para Estilização Rápida e Responsiva -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts para uma tipografia elegante e sagrada -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- SDK do Firebase Compatível (UMD) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            /* Variáveis no Modo Claro - Paleta Refinada */
+            --color-verde: #3d523a; 
+            --color-verde-deep: #21301f; 
+            --color-marrom: #5c3a1e;
+            --color-accent: #b59b54; /* Dourado/Champanhe para detalhes sacros */
+            --color-bg: #fcfbf9; /* Creme muito suave, quase papel offset */
+            --color-card-bg: #ffffff;
+            --color-text: #2d332d;
+            --color-text-muted: #6b7280;
+            --color-card-border: #f0ebe1;
+        }
+
+        /* Classes de transição suave e texturas */
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            transition: background-color 0.4s ease, color 0.4s ease;
+            /* Textura super subtil de papel para o fundo (apenas no modo claro) */
+            background-image: var(--bg-texture, url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23734d28' fill-opacity='0.02' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E"));
+        }
+        
+        .card-theme {
+            background-color: var(--color-card-bg);
+            border-color: var(--color-card-border);
+            transition: background-color 0.4s ease, border-color 0.4s ease, transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease;
+        }
+
+        .font-serif-poesia {
+            font-family: 'Lora', serif;
+        }
+        .font-titulo {
+            font-family: 'Cinzel', serif;
+        }
+        
+        /* Degradês para realçar o verde musgo orgânico */
+        .bg-verde-gradient {
+            background: linear-gradient(135deg, var(--color-verde) 0%, var(--color-verde-deep) 100%);
+            transition: background 0.3s ease;
+        }
+        .bg-verde { background-color: var(--color-verde); }
+        .text-verde { color: var(--color-verde); }
+        .text-marrom { color: var(--color-marrom); }
+        .text-accent { color: var(--color-accent); }
+        .border-verde { border-color: var(--color-verde); }
+        .border-marrom { border-color: var(--color-marrom); }
+        .border-accent { border-color: var(--color-accent); }
+        .bg-marrom { background-color: var(--color-marrom); }
+        
+        /* Efeito de foco personalizado nos inputs */
+        .focus-accent:focus {
+            outline: none;
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 2px rgba(181, 155, 84, 0.2);
+        }
+
+        /* Scrollbar customizada e elegante */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--color-bg); }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--color-accent); }
+
+        /* Animações de entrada */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-up { animation: fadeUp 0.6s ease-out forwards; }
+    </style>
+
+    <script>
+        // Estado global da aplicação anexado à window
+        window.currentUser = null;
+        window.isAdmin = false;
+        window.useFirebase = false;
+        window.auth = null;
+        window.db = null;
+        window.editingPoemId = null;
+        window.poemIdToDelete = null;
+        window.currentLoadedPoems = [];
+        window.currentSocials = { instagram: '', facebook: '', tiktok: '' };
+        window.favoritePoems = JSON.parse(localStorage.getItem('olhar_sacro_favorites') || '[]');
+        window.filterFavoritesOnly = false;
+        window.darkModeActive = localStorage.getItem('olhar_sacro_dark_mode') === 'true';
+
+        window.unsubscribePoems = null;
+        window.unsubscribeSocials = null;
+
+        let poemsContainer, noPoemsMsg, adminPanel, loginModal, addModal, editModal, deleteModal, readingModal, socialsModal;
+        let toastNotification, toastMessage, searchInput, loginForm, addPoemForm, editPoemForm, socialsForm;
+        let readingTitle, readingContent, readingOrigin;
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'olhar-sacro-app';
+
+        // Lógica de Alternar Modo de Leitura Noturna
+        window.toggleDarkMode = function() {
+            window.darkModeActive = !window.darkModeActive;
+            localStorage.setItem('olhar_sacro_dark_mode', window.darkModeActive);
+            window.applyDarkModeStyles();
+        };
+
+        window.applyDarkModeStyles = function() {
+            const root = document.documentElement;
+            const darkBtnIcon = document.getElementById('dark-mode-icon');
+            const darkBtnText = document.getElementById('dark-mode-text');
+            
+            if (window.darkModeActive) {
+                // Aplica variáveis do Modo Escuro (Tons de floresta noturna)
+                root.style.setProperty('--color-bg', '#131812'); 
+                root.style.setProperty('--color-card-bg', '#1b241a'); 
+                root.style.setProperty('--color-card-border', '#2a3628');
+                root.style.setProperty('--color-text', '#e5e7e1'); 
+                root.style.setProperty('--color-text-muted', '#9ca3af');
+                root.style.setProperty('--bg-texture', 'none'); // Remove textura no escuro
+                
+                if (darkBtnIcon) {
+                    darkBtnIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />`;
+                }
+                if (darkBtnText) darkBtnText.textContent = "Modo Claro";
+            } else {
+                // Aplica variáveis do Modo Claro
+                root.style.setProperty('--color-bg', '#fcfbf9');
+                root.style.setProperty('--color-card-bg', '#ffffff');
+                root.style.setProperty('--color-card-border', '#f0ebe1');
+                root.style.setProperty('--color-text', '#2d332d');
+                root.style.setProperty('--color-text-muted', '#6b7280');
+                root.style.setProperty('--bg-texture', `url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23734d28' fill-opacity='0.02' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E")`);
+                
+                if (darkBtnIcon) {
+                    darkBtnIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />`;
+                }
+                if (darkBtnText) darkBtnText.textContent = "Modo Leitura Noturna";
+            }
+        };
+
+        // Gestão de Favoritos (LocalStorage)
+        window.toggleFavorite = function(id, event) {
+            if (event) event.stopPropagation();
+            const index = window.favoritePoems.indexOf(id);
+            if (index === -1) {
+                window.favoritePoems.push(id);
+                window.showToast("Poesia guardada no seu coração!");
+            } else {
+                window.favoritePoems.splice(index, 1);
+                window.showToast("Poesia removida dos favoritos.");
+            }
+            localStorage.setItem('olhar_sacro_favorites', JSON.stringify(window.favoritePoems));
+            window.filterAndRenderPoems();
+        };
+
+        window.toggleFilterFavorites = function() {
+            window.filterFavoritesOnly = !window.filterFavoritesOnly;
+            const favToggleBtn = document.getElementById('btn-filter-favorites');
+            if (window.filterFavoritesOnly) {
+                favToggleBtn.classList.remove('bg-white', 'text-gray-400', 'border-gray-200');
+                favToggleBtn.classList.add('bg-marrom', 'text-white', 'border-marrom');
+                window.showToast("Exibindo apenas as poesias favoritas!");
+            } else {
+                favToggleBtn.classList.remove('bg-marrom', 'text-white', 'border-marrom');
+                favToggleBtn.classList.add('bg-white', 'text-gray-400', 'border-gray-200');
+            }
+            window.filterAndRenderPoems();
+        };
+
+        window.toggleModal = function(modalId, show) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+            if (show) {
+                modal.classList.remove('hidden');
+                if (modalId === 'reading-modal') document.body.style.overflow = 'hidden';
+            } else {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        };
+
+        window.closeModalOnBgClick = function(event, modalId) {
+            if (event.target === document.getElementById(modalId)) {
+                window.toggleModal(modalId, false);
+                if (modalId === 'edit-modal') window.editingPoemId = null;
+                if (modalId === 'delete-modal') window.poemIdToDelete = null;
+            }
+        };
+
+        window.openReadingModal = function(id) {
+            if (!window.currentLoadedPoems) return;
+            const poem = window.currentLoadedPoems.find(p => p.id === id);
+            if (!poem) return;
+            document.getElementById('reading-title').textContent = poem.title;
+            document.getElementById('reading-content').textContent = poem.content;
+            document.getElementById('reading-origin').textContent = poem.origin;
+
+            // Se for administrador, adiciona dinamicamente botões de Editar e Excluir no modal de leitura
+            const modalFooter = document.getElementById('reading-modal-footer');
+            if (modalFooter) {
+                modalFooter.innerHTML = '';
+                
+                if (window.isAdmin) {
+                    const adminActions = document.createElement('div');
+                    adminActions.className = "flex gap-3 w-full sm:w-auto";
+
+                    // Botão Editar dentro do Modal
+                    const editModalBtn = document.createElement('button');
+                    editModalBtn.className = "flex-1 sm:flex-none px-6 py-3 bg-[#3d523a] hover:bg-[#21301f] text-white rounded-full shadow-md text-xs font-bold uppercase tracking-widest transition-all hover:-translate-y-0.5";
+                    editModalBtn.textContent = "Editar";
+                    editModalBtn.onclick = function() {
+                        window.toggleModal('reading-modal', false);
+                        window.openEditModal(poem.id);
+                    };
+                    adminActions.appendChild(editModalBtn);
+
+                    // Botão Excluir dentro do Modal
+                    const deleteModalBtn = document.createElement('button');
+                    deleteModalBtn.className = "flex-1 sm:flex-none px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-md text-xs font-bold uppercase tracking-widest transition-all hover:-translate-y-0.5";
+                    deleteModalBtn.textContent = "Excluir";
+                    deleteModalBtn.onclick = function() {
+                        window.toggleModal('reading-modal', false);
+                        window.handleDeletePoem(poem.id);
+                    };
+                    adminActions.appendChild(deleteModalBtn);
+
+                    modalFooter.appendChild(adminActions);
+                }
+
+                // Botão Padrão de Fechar
+                const backBtn = document.createElement('button');
+                backBtn.className = "w-full sm:w-auto px-10 py-3 bg-marrom hover:bg-[#4a2e18] text-white rounded-full shadow-lg transition-all text-sm font-bold tracking-widest uppercase hover:-translate-y-1";
+                backBtn.textContent = "Voltar ao Acervo";
+                backBtn.onclick = window.closeReadingModal;
+                modalFooter.appendChild(backBtn);
+            }
+
+            window.toggleModal('reading-modal', true);
+        };
+
+        window.closeReadingModal = function() {
+            window.toggleModal('reading-modal', false);
+        };
+
+        window.openEditModal = function(id, event) {
+            if (event) event.stopPropagation();
+            if (!window.currentLoadedPoems) return;
+            const poem = window.currentLoadedPoems.find(p => p.id === id);
+            if (!poem) return;
+            window.editingPoemId = poem.id;
+            document.getElementById('edit-poem-title').value = poem.title;
+            document.getElementById('edit-poem-content').value = poem.content;
+            document.getElementById('edit-poem-origin').value = poem.origin;
+            window.toggleModal('edit-modal', true);
+        };
+
+        window.handleDeletePoem = function(id, event) {
+            if (event) event.stopPropagation();
+            if (!window.isAdmin) return;
+            window.poemIdToDelete = id;
+            window.toggleModal('delete-modal', true);
+        };
+
+        window.cancelDelete = function() {
+            window.toggleModal('delete-modal', false);
+            window.poemIdToDelete = null;
+        };
+
+        window.confirmDeleteAction = async function() {
+            if (!window.poemIdToDelete) return;
+            const id = window.poemIdToDelete;
+            window.toggleModal('delete-modal', false);
+            window.poemIdToDelete = null;
+
+            if (window.useFirebase && window.db && window.currentUser) {
+                try {
+                    // Sincroniza e força a deleção de forma compatível e estrita no Firestore
+                    await window.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('poems').doc(id).delete();
+                    window.showToast("Poesia removida com sucesso!");
+                } catch (error) {
+                    console.error("Erro ao apagar:", error);
+                    window.showToast("Erro ao excluir o documento.");
+                }
+            } else {
+                window.currentLoadedPoems = window.currentLoadedPoems.filter(p => p.id !== id);
+                localStorage.setItem('olhar_sacro_local_poems', JSON.stringify(window.currentLoadedPoems));
+                window.filterAndRenderPoems();
+                window.showToast("Poesia removida localmente!");
+            }
+        };
+
+        // Redes Sociais
+        window.openSocialsModal = function() {
+            document.getElementById('social-instagram').value = window.currentSocials.instagram || '';
+            document.getElementById('social-facebook').value = window.currentSocials.facebook || '';
+            document.getElementById('social-tiktok').value = window.currentSocials.tiktok || '';
+            window.toggleModal('socials-modal', true);
+        };
+
+        window.submitSocials = async function(event) {
+            event.preventDefault();
+            if (!window.isAdmin) return;
+
+            const insta = document.getElementById('social-instagram').value.trim();
+            const fb = document.getElementById('social-facebook').value.trim();
+            const tk = document.getElementById('social-tiktok').value.trim();
+            const submitBtn = document.getElementById('btn-submit-socials');
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "A salvar...";
+
+            const newSocials = { instagram: insta, facebook: fb, tiktok: tk };
+
+            if (window.useFirebase && window.db && window.currentUser) {
+                try {
+                    await window.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('socials').set(newSocials, { merge: true });
+                    window.showToast("Redes sociais atualizadas!");
+                    window.toggleModal('socials-modal', false);
+                } catch (error) {
+                    console.error("Erro ao salvar redes:", error);
+                    window.showToast("Erro ao guardar as alterações.");
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Salvar Redes";
+                }
+            } else {
+                window.currentSocials = newSocials;
+                localStorage.setItem('olhar_sacro_local_socials', JSON.stringify(window.currentSocials));
+                window.renderSocials();
+                window.showToast("Redes sociais atualizadas localmente!");
+                window.toggleModal('socials-modal', false);
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Salvar Redes";
+            }
+        };
+
+        window.renderSocials = function() {
+            const instaBtn = document.getElementById('link-instagram');
+            const fbBtn = document.getElementById('link-facebook');
+            const tkBtn = document.getElementById('link-tiktok');
+            const footerSocials = document.getElementById('footer-socials');
+
+            let hasAnySocial = false;
+
+            if (window.currentSocials.instagram) {
+                instaBtn.href = window.currentSocials.instagram;
+                instaBtn.classList.remove('hidden');
+                hasAnySocial = true;
+            } else { instaBtn.classList.add('hidden'); }
+
+            if (window.currentSocials.facebook) {
+                fbBtn.href = window.currentSocials.facebook;
+                fbBtn.classList.remove('hidden');
+                hasAnySocial = true;
+            } else { fbBtn.classList.add('hidden'); }
+
+            if (window.currentSocials.tiktok) {
+                tkBtn.href = window.currentSocials.tiktok;
+                tkBtn.classList.remove('hidden');
+                hasAnySocial = true;
+            } else { tkBtn.classList.add('hidden'); }
+
+            if (hasAnySocial) {
+                footerSocials.classList.remove('hidden');
+            } else {
+                footerSocials.classList.add('hidden');
+            }
+        };
+
+        window.handleAdminLogin = async function(event) {
+            event.preventDefault();
+            const email = document.getElementById('login-email').value.trim();
+            const pwd = document.getElementById('login-pwd').value;
+            const loginError = document.getElementById('login-error');
+
+            if (email === 'kauasantoos1631@gmail.com' && pwd === 'ka19sa06') {
+                if (window.useFirebase && window.auth && !window.currentUser) {
+                    try { await window.auth.signInAnonymously(); } catch (err) {}
+                }
+                window.setAdminState(true);
+                window.toggleModal('login-modal', false);
+                loginForm.reset();
+                loginError.classList.add('hidden');
+                window.showToast("Bem-vindo de volta, Kauã!");
+            } else {
+                loginError.textContent = "E-mail ou Palavra-passe incorretos. Apenas o criador pode aceder.";
+                loginError.classList.remove('hidden');
+            }
+        };
+
+        window.submitNewPoem = async function(event) {
+            event.preventDefault();
+            if (!window.isAdmin) return;
+
+            const title = document.getElementById('poem-title').value.trim();
+            const content = document.getElementById('poem-content').value.trim();
+            const origin = document.getElementById('poem-origin').value.trim();
+            const submitBtn = document.getElementById('btn-submit-poem');
+
+            if (!title || !content || !origin) return;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "A publicar...";
+
+            if (window.useFirebase && window.db && window.currentUser) {
+                try {
+                    await window.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('poems').add({
+                        title: title,
+                        content: content,
+                        origin: origin,
+                        timestamp: Date.now()
+                    });
+                    window.showToast("A sua obra foi publicada com sucesso!");
+                    window.toggleModal('add-modal', false);
+                    addPoemForm.reset();
+                } catch (error) {
+                    console.error("Erro ao adicionar poesia:", error);
+                    window.showToast("Não foi possível publicar. Tente novamente.");
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Publicar";
+                }
+            } else {
+                const newPoem = {
+                    id: 'local-' + Date.now(),
+                    title: title,
+                    content: content,
+                    origin: origin,
+                    timestamp: Date.now()
+                };
+                window.currentLoadedPoems.unshift(newPoem);
+                localStorage.setItem('olhar_sacro_local_poems', JSON.stringify(window.currentLoadedPoems));
+                window.filterAndRenderPoems();
+                window.showToast("A sua obra foi publicada localmente!");
+                window.toggleModal('add-modal', false);
+                addPoemForm.reset();
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Publicar";
+            }
+        };
+
+        window.submitEditPoem = async function(event) {
+            event.preventDefault();
+            if (!window.isAdmin || !window.editingPoemId) return;
+
+            const title = document.getElementById('edit-poem-title').value.trim();
+            const content = document.getElementById('edit-poem-content').value.trim();
+            const origin = document.getElementById('edit-poem-origin').value.trim();
+            const submitBtn = document.getElementById('btn-submit-edit-poem');
+
+            if (!title || !content || !origin) return;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = "A salvar...";
+
+            if (window.useFirebase && window.db && window.currentUser) {
+                try {
+                    await window.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('poems').doc(window.editingPoemId).update({
+                        title: title,
+                        content: content,
+                        origin: origin
+                    });
+                    window.showToast("Sua obra foi atualizada com sucesso!");
+                    window.toggleModal('edit-modal', false);
+                    editPoemForm.reset();
+                    window.editingPoemId = null;
+                } catch (error) {
+                    console.error("Erro ao atualizar poesia:", error);
+                    window.showToast("Não foi possível atualizar. Tente novamente.");
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Salvar";
+                }
+            } else {
+                const index = window.currentLoadedPoems.findIndex(p => p.id === window.editingPoemId);
+                if (index !== -1) {
+                    window.currentLoadedPoems[index].title = title;
+                    window.currentLoadedPoems[index].content = content;
+                    window.currentLoadedPoems[index].origin = origin;
+                    localStorage.setItem('olhar_sacro_local_poems', JSON.stringify(window.currentLoadedPoems));
+                    window.filterAndRenderPoems();
+                }
+                window.showToast("A sua obra foi actualizada localmente!");
+                window.toggleModal('edit-modal', false);
+                editPoemForm.reset();
+                window.editingPoemId = null;
+                submitBtn.disabled = false;
+                submitBtn.textContent = "Salvar";
+            }
+        };
+
+        window.logoutAdmin = function() {
+            window.setAdminState(false);
+            window.showToast("Saiu do Painel do Autor.");
+        };
+
+        window.showToast = function(message) {
+            toastMessage.textContent = message;
+            toastNotification.classList.remove('hidden', 'translate-y-4', 'opacity-0');
+            toastNotification.classList.add('translate-y-0', 'opacity-100');
+            setTimeout(() => {
+                toastNotification.classList.remove('translate-y-0', 'opacity-100');
+                toastNotification.classList.add('translate-y-4', 'opacity-0');
+                setTimeout(() => toastNotification.classList.add('hidden'), 300);
+            }, 4000);
+        };
+
+        window.setAdminState = function(state) {
+            window.isAdmin = state;
+            if (state) {
+                sessionStorage.setItem('olharSacroAdmin', 'true');
+                adminPanel.classList.remove('hidden');
+                document.getElementById('btn-open-login').classList.add('hidden');
+            } else {
+                sessionStorage.removeItem('olharSacroAdmin');
+                adminPanel.classList.add('hidden');
+                document.getElementById('btn-open-login').classList.remove('hidden');
+            }
+            window.renderPoemsList(window.currentLoadedPoems);
+        };
+
+        window.filterAndRenderPoems = function() {
+            const query = searchInput.value.trim().toLowerCase();
+            let filtered = window.currentLoadedPoems;
+
+            if (window.filterFavoritesOnly) {
+                filtered = filtered.filter(poem => window.favoritePoems.includes(poem.id));
+            }
+            if (query) {
+                filtered = filtered.filter(poem => poem.title.toLowerCase().includes(query));
+            }
+            window.renderPoemsList(filtered);
+        };
+
+        window.listenToData = function() {
+            if (window.useFirebase && window.db) {
+                if (!window.currentUser) return;
+
+                if (window.unsubscribePoems) window.unsubscribePoems();
+                if (window.unsubscribeSocials) window.unsubscribeSocials();
+
+                try {
+                    const poemsRef = window.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('poems');
+                    window.unsubscribePoems = poemsRef.onSnapshot((snapshot) => {
+                        const loadedPoems = [];
+                        snapshot.forEach((doc) => { loadedPoems.push({ id: doc.id, ...doc.data() }); });
+                        loadedPoems.sort((a, b) => b.timestamp - a.timestamp);
+                        window.currentLoadedPoems = loadedPoems;
+                        window.filterAndRenderPoems();
+                    }, (error) => {
+                        window.useFirebase = false; 
+                        window.listenToData();
+                    });
+
+                    const socialsRef = window.db.collection('artifacts').doc(appId).collection('public').doc('data').collection('settings').doc('socials');
+                    window.unsubscribeSocials = socialsRef.onSnapshot((doc) => {
+                        if (doc.exists) { window.currentSocials = doc.data(); }
+                        window.renderSocials();
+                    });
+                } catch (e) {
+                    window.useFirebase = false;
+                    window.listenToData();
+                }
+            } else {
+                const localData = localStorage.getItem('olhar_sacro_local_poems');
+                window.currentLoadedPoems = localData ? JSON.parse(localData) : [
+                    {
+                        id: "local-demo-1",
+                        title: "A Beleza do Amanhecer",
+                        content: "O sol aponta manso no horizonte como um sussurro da promessa de Deus. Cada raio dourado que corta a neblina matinal é um verso escrito pelo próprio Criador, convidando o mundo a recomeçar sob a Sua divina proteção.",
+                        origin: "Inspirado pela oração da manhã na janela do quarto.",
+                        timestamp: Date.now()
+                    },
+                    {
+                        id: "local-demo-2",
+                        title: "Deus nos Pequenos Detalhes",
+                        content: "Olho para a singela flor que nasce na calçada rústica. Ninguém a plantou, ninguém a rega além da chuva passageira. Mesmo assim, ela exibe cores que nenhum pintor conseguiria imitar. Ali, no silêncio do asfalto quente, Deus fala conosco por meio de pétalas.",
+                        origin: "Caminhada meditativa de fim de tarde.",
+                        timestamp: Date.now() - 10000
+                    },
+                    {
+                        id: "local-demo-3",
+                        title: "O Silêncio do Sacrário",
+                        content: "Diante daquela pequena porta dourada, o silêncio não é ausência de ruído, mas a plenitude de uma conversa sem palavras. O coração se aquieta e a alma compreende que o Criador do universe escolheu se fazer pequeno apenas para caber no nosso abraço.",
+                        origin: "Momento de adoração ao Santíssimo Sacramento na paróquia.",
+                        timestamp: Date.now() - 20000
+                    }
+                ];
+                window.filterAndRenderPoems();
+
+                const localSocials = localStorage.getItem('olhar_sacro_local_socials');
+                if (localSocials) { window.currentSocials = JSON.parse(localSocials); }
+                window.renderSocials();
+            }
+        };
+
+        window.renderPoemsList = function(poems) {
+            if (poems.length === 0) {
+                poemsContainer.classList.add('hidden');
+                noPoemsMsg.classList.remove('hidden');
+                return;
+            }
+
+            noPoemsMsg.classList.add('hidden');
+            poemsContainer.classList.remove('hidden');
+            poemsContainer.innerHTML = '';
+
+            poems.forEach((poem, index) => {
+                const isFavorite = window.favoritePoems.includes(poem.id);
+                
+                const article = document.createElement('article');
+                // Estilo do Cartão Editado: Borda muito suave, sombra refinada e lift no hover
+                article.className = "card-theme rounded-2xl shadow-sm hover:shadow-2xl border border-gray-100/50 flex flex-col justify-between cursor-pointer relative overflow-hidden group animate-fade-up";
+                article.style.animationDelay = `${index * 0.05}s`;
+                article.setAttribute('onclick', `openReadingModal('${poem.id}')`);
+
+                // Detalhe de aspas no fundo
+                const quoteIcon = document.createElement('div');
+                quoteIcon.className = "absolute -top-4 -right-2 text-[100px] font-serif leading-none opacity-[0.03] text-gray-900 pointer-events-none group-hover:opacity-[0.05] transition-opacity";
+                quoteIcon.textContent = '"';
+                article.appendChild(quoteIcon);
+
+                // Topo da borda decorativa (dourado e verde)
+                const coloredBanner = document.createElement('div');
+                coloredBanner.className = "h-1 w-full bg-gradient-to-r from-[var(--color-verde)] via-[var(--color-accent)] to-[var(--color-verde-deep)] opacity-80 group-hover:opacity-100 transition-opacity";
+                article.appendChild(coloredBanner);
+
+                const cardContent = document.createElement('div');
+                cardContent.className = "p-7 md:p-9 flex-grow flex flex-col justify-between relative z-10";
+
+                const topWrapper = document.createElement('div');
+                const headerWrapper = document.createElement('div');
+                headerWrapper.className = "flex justify-between items-start mb-5 gap-3";
+
+                const titleElement = document.createElement('h3');
+                titleElement.className = "text-xl font-titulo font-bold text-marrom group-hover:text-verde transition-colors flex-grow leading-tight tracking-wide";
+                titleElement.textContent = poem.title;
+                headerWrapper.appendChild(titleElement);
+
+                // Área de Botões (Editores e Favorito)
+                const controlContainer = document.createElement('div');
+                controlContainer.className = "flex items-center gap-1.5 flex-shrink-0 z-20";
+
+                // Botão de Favorito (Design refinado)
+                const favBtn = document.createElement('button');
+                favBtn.className = `p-1.5 rounded-full transition-all duration-300 ${isFavorite ? 'text-red-500 bg-red-50 hover:bg-red-100' : 'text-gray-400 hover:text-red-400 hover:bg-gray-50'}`;
+                favBtn.title = isFavorite ? "Remover dos favoritos" : "Guardar no coração";
+                favBtn.setAttribute('onclick', `toggleFavorite('${poem.id}', event)`);
+                favBtn.innerHTML = `
+                    <svg class="w-5 h-5 transition-transform ${isFavorite ? 'scale-110' : 'scale-100'}" fill="${isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                `;
+                controlContainer.appendChild(favBtn);
+
+                if (window.isAdmin) {
+                    const editBtn = document.createElement('button');
+                    editBtn.className = "text-[#3d523a] hover:text-[#283726] p-1.5 hover:bg-[#3d523a]/10 rounded-full transition-colors";
+                    editBtn.title = "Editar poesia";
+                    editBtn.setAttribute('onclick', `openEditModal('${poem.id}', event)`);
+                    editBtn.innerHTML = `<svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>`;
+                    controlContainer.appendChild(editBtn);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = "text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-full transition-colors";
+                    deleteBtn.title = "Excluir poesia";
+                    deleteBtn.setAttribute('onclick', `handleDeletePoem('${poem.id}', event)`);
+                    deleteBtn.innerHTML = `<svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+                    controlContainer.appendChild(deleteBtn);
+                }
+
+                headerWrapper.appendChild(controlContainer);
+                topWrapper.appendChild(headerWrapper);
+
+                const snippetText = poem.content.length > 140 ? poem.content.substring(0, 140) + "..." : poem.content;
+                const snippetElement = document.createElement('p');
+                // Tipografia da poesia na listagem refinada
+                snippetElement.className = "font-serif-poesia text-[15px] italic leading-relaxed line-clamp-4 text-gray-500 group-hover:text-gray-700 transition-colors";
+                snippetElement.textContent = snippetText;
+                topWrapper.appendChild(snippetElement);
+
+                cardContent.appendChild(topWrapper);
+
+                const footerAction = document.createElement('div');
+                footerAction.className = "mt-6 pt-4 border-t border-gray-100 flex justify-between items-center text-accent font-semibold text-xs tracking-widest uppercase opacity-80 group-hover:opacity-100 transition-opacity";
+                footerAction.innerHTML = `
+                    <span class="border-b border-transparent group-hover:border-accent transition-colors pb-0.5">Ler Poesia</span>
+                    <svg class="w-4 h-4 transform translate-x-0 group-hover:translate-x-1.5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                    </svg>
+                `;
+                cardContent.appendChild(footerAction);
+
+                article.appendChild(cardContent);
+                poemsContainer.appendChild(article);
+            });
+        };
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            poemsContainer = document.getElementById('poems-container');
+            noPoemsMsg = document.getElementById('no-poems-msg');
+            adminPanel = document.getElementById('admin-panel');
+            loginModal = document.getElementById('login-modal');
+            addModal = document.getElementById('add-modal');
+            editModal = document.getElementById('edit-modal');
+            deleteModal = document.getElementById('delete-modal');
+            readingModal = document.getElementById('reading-modal');
+            socialsModal = document.getElementById('socials-modal');
+            
+            toastNotification = document.getElementById('toast-notification');
+            toastMessage = document.getElementById('toast-message');
+            searchInput = document.getElementById('search-input');
+            loginForm = document.getElementById('login-form');
+            addPoemForm = document.getElementById('add-poem-form');
+            editPoemForm = document.getElementById('edit-poem-form');
+            socialsForm = document.getElementById('socials-form');
+            
+            readingTitle = document.getElementById('reading-title');
+            readingContent = document.getElementById('reading-content');
+            readingOrigin = document.getElementById('reading-origin');
+
+            window.applyDarkModeStyles();
+
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+
+            searchInput.addEventListener('input', window.filterAndRenderPoems);
+
+            if (sessionStorage.getItem('olharSacroAdmin') === 'true') {
+                window.setAdminState(true);
+            }
+
+            if (typeof firebase !== 'undefined' && firebaseConfig && firebaseConfig.apiKey && firebaseConfig.projectId) {
+                try {
+                    firebase.initializeApp(firebaseConfig);
+                    window.auth = firebase.auth();
+                    window.db = firebase.firestore();
+                    window.useFirebase = true;
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await window.auth.signInWithCustomToken(__initial_auth_token);
+                    } else {
+                        await window.auth.signInAnonymously();
+                    }
+
+                    window.auth.onAuthStateChanged((user) => {
+                        window.currentUser = user;
+                        if (user) {
+                            if (sessionStorage.getItem('olhar_sacro_admin') === 'true') {
+                                window.setAdminState(true);
+                            }
+                            window.listenToData(); 
+                        }
+                    });
+
+                } catch (err) {
+                    window.useFirebase = false;
+                    window.listenToData();
+                }
+            } else {
+                window.listenToData();
+            }
+        });
+    </script>
+</head>
+<body class="min-h-screen flex flex-col font-sans">
+
+    <!-- BOTÃO FLUTUANTE DE LEITURA NOTURNA -->
+    <button onclick="toggleDarkMode()" class="fixed bottom-6 right-6 z-[90] flex items-center justify-center bg-white/90 backdrop-blur-md border border-gray-200 text-marrom hover:text-verde hover:border-verde w-12 h-12 md:w-auto md:h-auto md:py-3 md:px-5 rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.12)] transition-all hover:scale-105 active:scale-95 duration-300" title="Alternar modo de leitura">
+        <svg id="dark-mode-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <!-- Icone inicial dinâmico -->
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+        </svg>
+        <span id="dark-mode-text" class="text-xs font-bold uppercase tracking-wider hidden md:inline ml-2 text-gray-700">Modo Noturno</span>
+    </button>
+
+    <!-- TOPO / CABEÇALHO (Redesenhado) -->
+    <header class="bg-verde-gradient text-white pt-20 pb-16 px-4 shadow-xl relative overflow-hidden">
+        <!-- Overlay sutil para profundidade -->
+        <div class="absolute inset-0 bg-black/10 mix-blend-multiply pointer-events-none"></div>
+        <div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: url('data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'1\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');"></div>
+
+        <div class="max-w-4xl mx-auto flex flex-col items-center text-center relative z-10">
+            
+            <!-- Logo Oficial Ajustada com Efeito Auréola e Margens Perfeitas -->
+            <div class="mb-8 w-40 h-40 rounded-full flex items-center justify-center relative transition-transform hover:scale-105 duration-500 shadow-[0_0_35px_rgba(181,155,84,0.4)]">
+                <img 
+                    src="logo-olharsacro.png" 
+                    alt="Logo Oficial Olhar Sacro" 
+                    class="w-full h-full object-contain rounded-full"
+                    onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1548625361-ec853f8aa69b?auto=format&fit=crop&q=80&w=400';"
+                />
+            </div>
+
+            <!-- Título da Conta -->
+            <h1 class="text-4xl md:text-6xl font-titulo font-bold tracking-widest mb-4 drop-shadow-md text-white/95">Olhar Sacro</h1>
+            
+            <!-- Divisor Decorativo SVG -->
+            <div class="flex items-center justify-center w-full mb-6 opacity-60">
+                <div class="h-px bg-gradient-to-r from-transparent via-accent to-transparent w-24 md:w-32"></div>
+                <svg class="w-6 h-6 mx-4 text-accent" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6-4.8-6 4.8 2.4-7.2-6-4.8h7.6z"/></svg>
+                <div class="h-px bg-gradient-to-r from-transparent via-accent to-transparent w-24 md:w-32"></div>
+            </div>
+
+            <p class="text-xl md:text-2xl font-serif-poesia italic opacity-95 mb-8 font-light text-white/90">
+                "Um olhar sagrado sobre o mundo"
+            </p>
+            
+            <div class="inline-flex items-center justify-center gap-2 bg-white/10 py-1.5 px-5 md:py-2 md:px-6 rounded-full backdrop-blur-md text-xs md:text-sm border border-white/20 shadow-[0_8px_30px_rgb(0,0,0,0.12)] hover:bg-white/15 transition-colors cursor-default w-[90%] sm:w-auto">
+                <svg class="w-4 h-4 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                </svg>
+                <span class="font-medium tracking-wide text-white/90 text-center leading-tight">Deus está nos detalhes; a poesia é um deles!</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- NOTIFICAÇÃO DO SISTEMA -->
+    <div id="toast-notification" class="hidden fixed top-6 right-6 z-50 max-w-sm w-full bg-white rounded-xl shadow-2xl p-4 border-l-4 border-accent transform transition-all duration-300 translate-y-4 opacity-0">
+        <div class="flex items-center gap-3">
+            <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <p id="toast-message" class="text-sm font-medium text-gray-800"></p>
+        </div>
+    </div>
+
+    <!-- PAINEL DE CONTROLE DO ADMINISTRADOR -->
+    <div id="admin-panel" class="hidden bg-marrom text-white py-3 px-4 sticky top-0 z-40 shadow-lg border-b border-accent/20">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-2 font-semibold">
+                <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+                <span class="tracking-wide">Painel do Autor (Kauã Rodrigues)</span>
+            </div>
+            <div class="flex flex-wrap gap-2 md:gap-3">
+                <button onclick="window.openSocialsModal()" class="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-colors font-medium text-sm border border-white/5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                    </svg>
+                    Redes
+                </button>
+                <button onclick="toggleModal('add-modal', true)" class="flex items-center gap-1.5 bg-accent hover:bg-[#a38a45] text-white px-4 py-2 rounded-lg transition-colors font-medium text-sm shadow-md">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Nova Poesia
+                </button>
+                <button onclick="logoutAdmin()" class="flex items-center gap-1.5 text-white/70 hover:text-white transition-colors text-sm pl-3 border-l border-white/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                    </svg>
+                    Sair
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="max-w-5xl mx-auto px-4 py-16 flex-grow w-full">
+        
+        <!-- SEÇÃO SOBRE O AUTOR (Design Editorial) -->
+        <section class="mb-20">
+            <div class="card-theme rounded-2xl md:rounded-3xl shadow-sm border p-8 md:p-14 relative mx-auto max-w-4xl">
+                <!-- Marca d'água elegante -->
+                <div class="absolute top-8 left-8 text-accent opacity-10 pointer-events-none">
+                    <svg class="w-16 h-16" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/></svg>
+                </div>
+                
+                <div class="relative z-10 flex flex-col items-center">
+                    <h2 class="text-3xl md:text-4xl font-titulo font-bold text-center mb-4 text-marrom tracking-wide">
+                        Sobre o Olhar Sacro
+                    </h2>
+                    <div class="w-16 h-1 bg-accent mb-8 rounded-full"></div>
+                    
+                    <div class="space-y-5 leading-loose text-[1.05rem] md:text-lg text-justify font-serif-poesia text-gray-700">
+                        <p class="first-letter:text-5xl first-letter:font-titulo first-letter:text-verde first-letter:mr-2 first-letter:float-left first-letter:leading-none">
+                            A paz de Cristo! Meu nome é <strong class="text-marrom font-semibold">Kauã Rodrigues de Sousa Santos</strong>, o criador das poesias <em>Olhar Sacro</em>. Sou Católico Apostólico Romano. Antes de minha conversão, já escrevia algumas poesias com destinos não religiosos. Com o tempo, porém, Cristo me buscou e senti o poderoso amor eterno que Ele oferece aos Seus fiéis. Contudo, após um declínio em minha vida, decidi começar a escrever os meus sentimentos — mas, dessa vez, todos eram uma declaração ou desabafo a Deus e à Virgem Maria.
+                        </p>
+                        <p>
+                            Guardei essas poesias para mim e poucas pessoas as viram; todavia, Cristo usou justamente essas pessoas para me dizer: <em class="text-verde font-medium">"Por que não postas? Você não pode deixá-las escondidas."</em> Pensando nisso, criei o <strong>Olhar Sacro</strong>, que significa "Olhar sagrado". 
+                        </p>
+                        <p class="text-center italic font-medium text-marrom text-xl mt-6">
+                            "Muitas vezes deixamos detalhes de conversão passarem diante de nossos olhos por não termos o olhar sacro. Deus está nos detalhes; a poesia é um deles!"
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- SEÇÃO DE POESIAS COM FILTRO -->
+        <section>
+            <div class="flex flex-col md:flex-row justify-between items-center gap-6 mb-10 pb-6 border-b border-gray-200/60">
+                <h2 class="text-3xl font-titulo font-bold flex items-center gap-3 text-verde">
+                    <svg class="w-7 h-7 text-accent flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                    </svg>
+                    Biblioteca de Poesias
+                </h2>
+
+                <!-- Barra de Pesquisa e Filtros (Refinados) -->
+                <div class="flex items-center gap-3 w-full md:w-auto">
+                    <!-- Lupa de Favoritos -->
+                    <button id="btn-filter-favorites" onclick="toggleFilterFavorites()" class="card-theme border p-3 rounded-full shadow-sm hover:text-red-500 hover:border-red-200 transition-all flex-shrink-0 text-gray-400 group" title="Ver apenas favoritos">
+                        <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                        </svg>
+                    </button>
+                    <!-- Input de Busca -->
+                    <div class="relative w-full md:w-72">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </span>
+                        <input 
+                            type="text" 
+                            id="search-input" 
+                            placeholder="Pesquisar por título..." 
+                            class="w-full card-theme border rounded-full pl-11 pr-4 py-2.5 text-sm focus-accent shadow-sm placeholder-gray-400 transition-all"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contêiner de Poesias (Grid Dinâmico) -->
+            <div id="poems-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Poesias renderizadas via JS -->
+            </div>
+            
+            <div id="no-poems-msg" class="hidden text-center text-gray-500 py-16 font-serif-poesia italic text-lg">
+                O silêncio também é resposta. Nenhuma poesia encontrada.
+            </div>
+        </section>
+
+    </main>
+
+    <!-- RODAPÉ -->
+    <footer class="bg-verde-gradient text-white/90 py-12 text-center mt-auto border-t-4 border-accent">
+        <div class="max-w-4xl mx-auto px-4">
+            
+            <!-- CONTÊINER DAS REDES SOCIAIS -->
+            <div id="footer-socials" class="hidden mb-10 text-center">
+                <p class="text-sm md:text-base text-accent mb-5 font-serif-poesia italic tracking-wide">
+                    Encontre mais poesias e acompanhe o nosso dia a dia nas redes sociais:
+                </p>
+                <div class="flex flex-wrap justify-center gap-4 md:gap-6">
+                    <!-- Instagram -->
+                    <a id="link-instagram" href="#" target="_blank" class="hidden group flex items-center gap-2.5 bg-white/10 hover:bg-white/20 border border-white/20 px-6 py-3 rounded-full text-xs md:text-sm font-semibold transition-all hover:-translate-y-1 shadow-lg" title="Instagram">
+                        <svg class="w-5 h-5 text-white group-hover:text-accent transition-colors" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.45 2.525c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63zm-.081 1.802h-.468c-2.456 0-2.784.011-3.807.058-.975.045-1.504.207-1.857.344-.467.182-.8.398-1.15.748-.35.35-.566.683-.748 1.15-.137.353-.3.882-.344 1.857-.047 1.023-.058 1.351-.058 3.807v.468c0 2.456.011 2.784.058 3.807.045.975.207 1.504.344 1.857.182.466.399.8.748 1.15.35.35.683.566 1.15.748.353.137.882.3 1.857.344 1.054.048 1.37.058 4.041.058h.08c2.597 0 2.917-.01 3.96-.058.976-.045 1.505-.207 1.858-.344.466-.182.8-.398 1.15-.748.35-.35.566-.683.748-1.15.137-.353.3-.882.344-1.857.048-1.055.058-1.37.058-4.041v-.08c0-2.597-.01-2.917-.058-3.96-.045-.976-.207-1.505-.344-1.858a3.097 3.097 0 00-.748-1.15 3.098 3.098 0 00-1.15-.748c-.353-.137-.882-.3-1.857-.344-1.023-.047-1.351-.058-3.807-.058zM12 6.865a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z" clip-rule="evenodd" />
+                        </svg>
+                        <span class="tracking-wide">Instagram</span>
+                    </a>
+                    <!-- Facebook -->
+                    <a id="link-facebook" href="#" target="_blank" class="hidden group flex items-center gap-2.5 bg-white/10 hover:bg-white/20 border border-white/20 px-6 py-3 rounded-full text-xs md:text-sm font-semibold transition-all hover:-translate-y-1 shadow-lg" title="Facebook">
+                        <svg class="w-5 h-5 text-white group-hover:text-accent transition-colors" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clip-rule="evenodd" />
+                        </svg>
+                        <span class="tracking-wide">Facebook</span>
+                    </a>
+                    <!-- TikTok -->
+                    <a id="link-tiktok" href="#" target="_blank" class="hidden group flex items-center gap-2.5 bg-white/10 hover:bg-white/20 border border-white/20 px-6 py-3 rounded-full text-xs md:text-sm font-semibold transition-all hover:-translate-y-1 shadow-lg" title="TikTok">
+                        <svg class="w-5 h-5 text-white group-hover:text-accent transition-colors" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path>
+                        </svg>
+                        <span class="tracking-wide">TikTok</span>
+                    </a>
+                </div>
+            </div>
+
+            <p class="mb-2 font-medium tracking-wide">© <span id="current-year"></span> Olhar Sacro. Todos os direitos reservados.</p>
+            <p class="text-xs text-white/50 mb-6 font-serif-poesia">Escrito por Kauã Rodrigues</p>
+            
+            <!-- Botão de Login do Admin -->
+            <button id="btn-open-login" onclick="toggleModal('login-modal', true)" class="text-[10px] uppercase tracking-widest text-white/40 hover:text-accent transition-all inline-flex items-center gap-1.5 mx-auto py-1 px-3">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                Acesso do Escritor
+            </button>
+        </div>
+    </footer>
+
+    <!-- MODAIS DO SISTEMA -->
+
+    <!-- MODAL DE REDES SOCIAIS (ADMIN) -->
+    <div id="socials-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[100] backdrop-blur-sm" onclick="closeModalOnBgClick(event, 'socials-modal')">
+        <div class="card-theme rounded-2xl shadow-2xl max-w-lg w-full p-6 md:p-8 border-t-[8px] border-t-accent text-gray-800" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-titulo font-bold text-verde flex items-center gap-2">
+                    <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                    </svg>
+                    Suas Redes Sociais
+                </h3>
+                <button onclick="toggleModal('socials-modal', false)" class="text-gray-400 hover:text-red-500 transition-colors bg-black/5 p-1.5 rounded-full">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <form id="socials-form" onsubmit="submitSocials(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Instagram</label>
+                    <input type="url" id="social-instagram" placeholder="https://instagram.com/..." class="w-full card-theme border rounded-lg px-4 py-2.5 focus-accent text-sm transition-shadow text-gray-800" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Facebook</label>
+                    <input type="url" id="social-facebook" placeholder="https://facebook.com/..." class="w-full card-theme border rounded-lg px-4 py-2.5 focus-accent text-sm transition-shadow text-gray-800" />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">TikTok</label>
+                    <input type="url" id="social-tiktok" placeholder="https://tiktok.com/..." class="w-full card-theme border rounded-lg px-4 py-2.5 focus-accent text-sm transition-shadow text-gray-800" />
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-4 mt-2 border-t border-gray-100/10">
+                    <button type="button" onclick="toggleModal('socials-modal', false)" class="px-5 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition font-medium text-sm">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="btn-submit-socials" class="px-6 py-2 bg-verde hover:bg-verde-deep text-white rounded-lg shadow-md font-medium text-sm transition-all">
+                        Salvar Redes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE LOGIN ADMIN -->
+    <div id="login-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[100] backdrop-blur-sm" onclick="closeModalOnBgClick(event, 'login-modal')">
+        <div class="card-theme rounded-2xl shadow-2xl max-w-sm w-full p-6 md:p-8 border border-t-[8px] border-t-accent text-gray-800" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-titulo font-bold text-verde flex items-center gap-2">
+                    <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 00-2 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    Acesso Restrito
+                </h3>
+                <button onclick="toggleModal('login-modal', false)" class="text-gray-400 hover:text-red-500 transition-colors bg-black/5 p-1.5 rounded-full">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <form id="login-form" onsubmit="handleAdminLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">E-mail</label>
+                    <input type="email" id="login-email" placeholder="seu-email@gmail.com" class="w-full card-theme border rounded-lg px-4 py-2.5 focus-accent text-sm text-gray-800" required />
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Palavra-passe</label>
+                    <input type="password" id="login-pwd" placeholder="••••••••" class="w-full card-theme border rounded-lg px-4 py-2.5 focus-accent text-sm text-gray-800" required />
+                </div>
+                
+                <p id="login-error" class="text-red-500 text-xs hidden font-medium"></p>
+                
+                <button type="submit" class="w-full bg-marrom hover:bg-[#4a2e18] text-white py-2.5 rounded-lg font-semibold shadow-md text-sm mt-4 transition-colors">
+                    Aceder ao Panel
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL ADICIONAR POESIA -->
+    <div id="add-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[100] backdrop-blur-sm" onclick="closeModalOnBgClick(event, 'add-modal')">
+        <div class="card-theme rounded-2xl shadow-2xl max-w-3xl w-full p-6 md:p-10 max-h-[90vh] overflow-y-auto border border-t-[8px] border-t-accent text-gray-800" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-8 border-b border-gray-100/10 pb-4">
+                <h3 class="text-2xl font-titulo font-bold text-marrom flex items-center gap-2">
+                    <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                    Escrever Nova Poesia
+                </h3>
+                <button onclick="toggleModal('add-modal', false)" class="text-gray-400 hover:text-red-500 transition-colors bg-black/5 p-1.5 rounded-full">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <form id="add-poem-form" onsubmit="submitNewPoem(event)" class="space-y-6">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Título da Obra</label>
+                    <input type="text" id="poem-title" placeholder="A Luz da Manhã..." class="w-full card-theme border rounded-lg px-4 py-3 focus-accent text-lg font-titulo font-semibold text-gray-800" required />
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2">A Poesia (Prosa)</label>
+                    <textarea id="poem-content" rows="8" placeholder="Escreva aqui os parágrafos com alma e sensibilidade..." class="w-full card-theme border rounded-lg px-4 py-3 focus-accent text-[1.05rem] font-serif-poesia leading-relaxed text-gray-800" required></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Origem / Inspiração</label>
+                    <textarea id="poem-origin" rows="2" placeholder="Qual foi o detalhe divino que inspirou esta poesia?" class="w-full card-theme border rounded-lg px-4 py-3 focus-accent text-sm italic text-gray-800" required></textarea>
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100/10">
+                    <button type="button" onclick="toggleModal('add-modal', false)" class="px-6 py-2.5 text-gray-500 hover:text-gray-800 transition font-medium text-sm">Cancelar</button>
+                    <button type="submit" id="btn-submit-poem" class="px-8 py-2.5 bg-verde hover:bg-verde-deep text-white rounded-lg shadow-md font-bold text-sm tracking-wide transition-all">Publicar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR POESIA -->
+    <div id="edit-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[100] backdrop-blur-sm" onclick="closeModalOnBgClick(event, 'edit-modal')">
+        <div class="card-theme rounded-2xl shadow-2xl max-w-3xl w-full p-6 md:p-10 max-h-[90vh] overflow-y-auto border border-t-[8px] border-t-accent text-gray-800" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-8 border-b border-gray-100/10 pb-4">
+                <h3 class="text-2xl font-titulo font-bold text-marrom flex items-center gap-2">
+                    <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                    </svg>
+                    Refinar Poesia
+                </h3>
+                <button onclick="toggleModal('edit-modal', false)" class="text-gray-400 hover:text-red-500 transition-colors bg-black/5 p-1.5 rounded-full">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <form id="edit-poem-form" onsubmit="submitEditPoem(event)" class="space-y-6">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Título da Obra</label>
+                    <input type="text" id="edit-poem-title" class="w-full card-theme border rounded-lg px-4 py-3 focus-accent text-lg font-titulo font-semibold text-gray-800" required />
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">A Poesia (Prosa)</label>
+                    <textarea id="edit-poem-content" rows="8" class="w-full card-theme border rounded-lg px-4 py-3 focus-accent text-[1.05rem] font-serif-poesia leading-relaxed text-gray-800" required></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Origem / Inspiração</label>
+                    <textarea id="edit-poem-origin" rows="2" class="w-full card-theme border rounded-lg px-4 py-3 focus-accent text-sm italic text-gray-800" required></textarea>
+                </div>
+                
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100/10">
+                    <button type="button" onclick="toggleModal('edit-modal', false)" class="px-6 py-2.5 text-gray-500 hover:text-gray-800 transition font-medium text-sm">Cancelar</button>
+                    <button type="submit" id="btn-submit-edit-poem" class="px-8 py-2.5 bg-verde text-white rounded-lg shadow-md font-bold text-sm tracking-wide transition-all">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL DE LEITURA FOCADA (SALA DE LEITURA SACRA - Clássica) -->
+    <div id="reading-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-[110] backdrop-blur-md" onclick="closeModalOnBgClick(event, 'reading-modal')">
+        <div class="bg-[#faf8f4] text-gray-800 rounded-2xl md:rounded-3xl shadow-2xl max-w-2xl w-full p-8 md:p-12 max-h-[90vh] overflow-y-auto border-t-[8px] border-t-accent flex flex-col relative" onclick="event.stopPropagation()">
+            
+            <button onclick="closeReadingModal()" class="absolute top-5 right-5 text-gray-400 hover:text-red-500 transition-colors bg-black/5 p-2 rounded-full">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+
+            <!-- Cabeçalho do Modal Clássico -->
+            <div class="mb-10 mt-4 text-center">
+                <h3 id="reading-title" class="text-3xl md:text-4xl font-titulo font-bold text-marrom mb-4">Título</h3>
+                <div class="flex items-center justify-center w-full opacity-50">
+                    <div class="h-px bg-marrom w-16"></div>
+                    <svg class="w-4 h-4 mx-3 text-accent" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.4 7.2h7.6l-6 4.8 2.4 7.2-6-4.8-6 4.8 2.4-7.2-6-4.8h7.6z"/></svg>
+                    <div class="h-px bg-marrom w-16"></div>
+                </div>
+            </div>
+
+            <!-- Corpo da Poesia no Modal -->
+            <div id="reading-content" class="text-gray-800 text-[1.1rem] md:text-[1.25rem] leading-[2] font-serif-poesia whitespace-pre-wrap mb-10 md:px-6">
+                Poesia...
+            </div>
+
+            <!-- Origem / Inspiração do Texto -->
+            <div id="reading-origin-container" class="bg-gray-500/5 rounded-2xl p-6 border border-gray-500/10 mb-8 mt-auto">
+                <h4 class="text-[11px] font-bold uppercase tracking-widest text-accent mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Inspiração da Obra
+                </h4>
+                <p id="reading-origin" class="text-gray-600 text-sm md:text-base italic leading-relaxed">
+                    Origem...
+                </p>
+            </div>
+
+            <!-- BOTÃO DE VOLTAR À BIBLIOTECA E CONTROLES DO ADMIN -->
+            <div id="reading-modal-footer" class="flex flex-col sm:flex-row justify-center sm:justify-between items-center gap-4 pt-2">
+                <button onclick="closeReadingModal()" class="w-full sm:w-auto px-10 py-3 bg-marrom hover:bg-[#4a2e18] text-white rounded-full shadow-lg transition-all text-sm font-bold tracking-widest uppercase hover:-translate-y-1">
+                    Voltar ao Acervo
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
