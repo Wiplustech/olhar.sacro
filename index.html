@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olhar Sacro — Poesia e Evangelização</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Cinzel:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Configuração de cores personalizadas do Tailwind -->
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        sacro: {
+                            verde: '#404F43',    /* Verde musgo principal */
+                            verdeClaro: '#526656',
+                            marrom: '#543F30',   /* Marrom terra principal */
+                            marromClaro: '#735B49',
+                            marromEscuro: '#3B2B20',
+                            creme: '#FAF8F5',    /* Fundo suave off-white */
+                            areia: '#EFECE6',    /* Elementos secundários */
+                            escuro: '#1F1E1B',   /* Texto principal */
+                        }
+                    },
+                    fontFamily: {
+                        serif: ['Playfair Display', 'serif'],
+                        sans: ['Inter', 'sans-serif'],
+                        brand: ['Cinzel', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Transição de cores suave para o modo escuro */
+        * {
+            transition-property: background-color, border-color, text-decoration-color, fill, stroke, transform;
+            transition-duration: 250ms;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .text-glow {
+            text-shadow: 0 0 12px rgba(250, 248, 245, 0.4);
+        }
+        .serif-italic {
+            font-family: 'Playfair Display', serif;
+            font-style: italic;
+        }
+    </style>
+    
+    <!-- Script de prevenção contra flashes claros no carregamento rápido -->
+    <script>
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
+</head>
+<body class="font-sans bg-sacro-creme text-sacro-escuro dark:bg-[#121613] dark:text-sacro-creme selection:bg-sacro-marrom selection:text-white">
+
+    <!-- Header / Barra de Navegação -->
+    <header class="sticky top-0 z-40 bg-sacro-creme/95 dark:bg-[#121613]/95 backdrop-blur-md border-b border-sacro-areia dark:border-sacro-verde/20 transition-all">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <a href="#" class="flex items-center gap-2">
+                <span class="font-brand text-lg tracking-widest text-sacro-verde dark:text-sacro-areia font-bold">OLHAR SACRO</span>
+            </a>
+            
+            <div class="flex items-center gap-4 md:gap-6">
+                <nav class="flex items-center gap-5 text-xs sm:text-sm font-medium text-sacro-marrom dark:text-sacro-areia/90">
+                    <a href="#sobre" class="hover:text-sacro-verde dark:hover:text-white transition">O Autor</a>
+                    <a href="#poesias" class="hover:text-sacro-verde dark:hover:text-white transition">Poesias</a>
+                    <a href="#redes" class="hover:text-sacro-verde dark:hover:text-white transition">Redes</a>
+                </nav>
+
+                <!-- Botão de Música Ambiente (Nativa) -->
+                <button id="music-btn" class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-sacro-areia dark:border-sacro-verde/30 text-xs font-semibold text-sacro-marrom dark:text-sacro-areia hover:bg-sacro-areia dark:hover:bg-sacro-verde/20 transition" aria-label="Música Ambiente">
+                    <span class="relative flex h-2 w-2 hidden" id="music-indicator">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sacro-marrom dark:bg-sacro-areia opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-sacro-marrom dark:bg-sacro-areia"></span>
+                    </span>
+                    <span id="music-text">Música Ambiente</span>
+                </button>
+
+                <!-- Botão de Alternância de Tema -->
+                <button id="theme-toggle" class="p-2 rounded-full border border-sacro-areia dark:border-sacro-verde/30 hover:bg-sacro-areia dark:hover:bg-sacro-verde/40 transition" aria-label="Alternar modo escuro">
+                    <svg id="theme-toggle-light-icon" class="hidden w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0s-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41l-1.06-1.06zm1.06-12.37c-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.38.39-1.02 0-1.41zM5.99 16.95l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41s-1.03-.39-1.41 0z"/>
+                    </svg>
+                    <svg id="theme-toggle-dark-icon" class="hidden w-4 h-4 text-sacro-marrom dark:text-sacro-areia" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12.3 22h-.1c-5.5 0-10-4.5-10-10C2.2 6.8 6.2 2.7 11.5 2.1c.5-.1 1 .3 1 .8s-.3.9-.8 1c-4.2.6-7.3 4.2-7.3 8.6 0 4.8 3.9 8.7 8.7 8.7 3.8 0 7.2-2.5 8.3-6.2.2-.5.7-.7 1.2-.5.5.2.7.7.5 1.2-1.5 4.1-5.4 6.3-10.1 6.3z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Seção Hero (Abertura do Site com Logo) -->
+    <section class="relative bg-sacro-verde text-sacro-creme py-20 px-6 overflow-hidden">
+        <div class="absolute inset-0 opacity-5 flex items-center justify-center pointer-events-none">
+            <span class="font-brand text-[25vw] select-none text-sacro-creme">†</span>
+        </div>
+        
+        <div class="max-w-4xl mx-auto text-center relative z-10 space-y-8 flex flex-col items-center">
+            
+            <!-- Logo principal centralizada -->
+            <div class="w-32 h-32 md:w-36 md:h-36 rounded-full bg-white border-4 border-sacro-areia shadow-2xl flex items-center justify-center overflow-hidden mb-2 hover:scale-105 duration-300">
+                <img src="logo-olharsacro.png" alt="Logo Olhar Sacro" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='https://placehold.co/200x200/404F43/FAF8F5?text=%E2%80%A0';">
+            </div>
+
+            <!-- Modificação: Apenas "poesia católica" -->
+            <p class="font-brand text-[10px] md:text-xs uppercase tracking-[0.3em] text-sacro-areia/85">poesia católica</p>
+            
+            <h1 class="font-serif text-3xl md:text-5xl lg:text-6xl font-semibold leading-tight max-w-3xl mx-auto">
+                "Deus está nos detalhes; <br class="hidden md:block">
+                <span class="serif-italic text-sacro-creme/90">a poesia é um deles!"</span>
+            </h1>
+            
+            <div class="w-16 h-[2px] bg-sacro-areia/40"></div>
+            
+            <p class="font-sans text-base md:text-lg font-light text-sacro-areia/90 max-w-xl mx-auto italic">
+                “Um olhar sagrado sobre o mundo”
+            </p>
+            
+            <div class="pt-4 w-full sm:w-auto">
+                <a href="#poesias" class="block sm:inline-block bg-sacro-marrom text-sacro-creme hover:bg-sacro-marromClaro text-center transition duration-300 font-medium px-8 py-3.5 rounded-full shadow-lg text-xs tracking-wider uppercase">
+                    Ler Poesias
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Seção Sobre o Autor & História -->
+    <section id="sobre" class="py-20 px-6 max-w-5xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-12 items-center">
+            
+            <!-- Card de Identidade do Autor (Marrom e Creme) -->
+            <div class="md:col-span-5 bg-sacro-marrom text-sacro-creme p-8 rounded-3xl flex flex-col justify-between h-80 shadow-lg border border-sacro-marromClaro relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10 text-sacro-creme">
+                    <svg class="w-48 h-48" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 0 0 2 12a10 10 0 0 0 10 10a10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 2a8 8 0 0 1 8 8c0 1.54-.43 2.97-1.18 4.19l-1.46-1.46c.4-1.04.64-2.17.64-3.35c0-4.42-3.58-8-8-8c-1.18 0-2.31.24-3.35.64L6.19 5.18C7.41 4.43 8.84 4 12 4m-8 8c0-1.54.43-2.97 1.18-4.19l1.46 1.46C6.24 10.31 6 11.44 6 12.62c0 4.42 3.58 8 8 8c1.18 0 2.31-.24 3.35-.64l1.46 1.46c-1.22.75-2.65 1.18-4.19 1.18c-4.42 0-8-3.58-8-8z"/></svg>
+                </div>
+                <div>
+                    <span class="font-brand text-xs tracking-widest text-sacro-areia/80 uppercase">Escritor & Poeta</span>
+                    <h3 class="font-serif text-3xl font-bold text-white mt-2">Kauã Rodrigues</h3>
+                    <p class="text-sm text-sacro-areia/90 mt-1">de Sousa Santos</p>
+                </div>
+                <div class="border-t border-sacro-creme/20 pt-4">
+                    <p class="text-xs text-sacro-areia/70 uppercase tracking-wider">Fundador do Olhar Sacro</p>
+                </div>
+            </div>
+            
+            <!-- Narrativa Histórica -->
+            <div class="md:col-span-7 space-y-6">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-[1px] bg-sacro-marrom dark:bg-sacro-areia"></div>
+                    <!-- Modificação: Apenas "História" -->
+                    <span class="font-brand text-xs uppercase tracking-wider text-sacro-marrom dark:text-sacro-areia">História</span>
+                </div>
+                
+                <!-- Modificação: Apenas "A beleza do invisível" -->
+                <h2 class="font-serif text-3xl md:text-4xl font-bold text-sacro-verde dark:text-sacro-areia">A beleza do invisível</h2>
+                
+                <p class="text-sacro-escuro/85 dark:text-sacro-creme/90 leading-relaxed text-sm md:text-base">
+                    A página <strong class="text-sacro-marrom dark:text-sacro-areia font-semibold">Olhar Sacro</strong> nasceu com um propósito claro e sincero: evangelizar por meio da beleza das palavras. Em um ambiente digital repleto de ruídos, percebemos a necessidade urgente de resgatar o silêncio interior, a devoção sincera e a contemplação dos mistérios de Deus que se revelam no cotidiano.
+                </p>
+                
+                <p class="text-sacro-escuro/85 dark:text-sacro-creme/90 leading-relaxed text-sm md:text-base">
+                    Criada e escrita por <strong class="text-sacro-marrom dark:text-sacro-areia font-semibold">Kauã Rodrigues de Sousa Santos</strong>, cada verso compartilhado é fruto de orações, meditações e sentimentos profundos de entrega. Queremos que este espaço seja um pouso seguro para quem busca paz, e um lembrete constante de que o Criador fala conosco de maneiras sutis e belíssimas, afinal, <span class="serif-italic text-sacro-marrom dark:text-sacro-areia font-bold text-lg block mt-3">Deus está nos detalhes; a poesia é um deles!</span>
+                </p>
+            </div>
+            
+        </div>
+    </section>
+
+    <!-- Seção de Poesias (Cards Dinâmicos com Filtro & Busca) -->
+    <section id="poesias" class="py-20 bg-sacro-areia/40 dark:bg-[#1c221e]/30 px-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center space-y-4 mb-12">
+                <!-- Modificação: Alterado de "Mural Poético" para "Mural de" -->
+                <span class="font-brand text-xs uppercase tracking-widest text-sacro-marrom dark:text-sacro-areia">Mural de</span>
+                <h2 class="font-serif text-4xl font-bold text-sacro-verde dark:text-sacro-areia">Poesias</h2>
+                <div class="w-12 h-[2px] bg-sacro-marrom/40 dark:bg-sacro-areia/40 mx-auto"></div>
+            </div>
+
+            <!-- Mecanismo de Busca -->
+            <div class="max-w-2xl mx-auto mb-12">
+                <div class="relative">
+                    <input type="text" id="search-input" placeholder="Buscar por versos ou títulos..." class="w-full px-5 py-3 rounded-full border border-sacro-areia dark:border-sacro-verde/30 bg-sacro-creme dark:bg-[#121613] focus:outline-none focus:ring-2 focus:ring-sacro-marrom dark:focus:ring-sacro-areia text-sm">
+                    <span class="absolute right-4 top-3.5 opacity-50">🔍</span>
+                </div>
+            </div>
+
+            <!-- Grid de Poesias (Gerado e Controlado Dinamicamente via JS) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center max-w-5xl mx-auto" id="poesias-grid">
+                <!-- Inserido dinamicamente via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Seção de Conexão com Redes Sociais -->
+    <section id="redes" class="py-20 px-6 text-center max-w-4xl mx-auto space-y-10">
+        <div class="space-y-4">
+            <span class="font-brand text-xs uppercase tracking-widest text-sacro-marrom dark:text-sacro-areia">Evangelização Digital</span>
+            <h2 class="font-serif text-3xl md:text-4xl font-bold text-sacro-verde dark:text-sacro-areia">Acompanhe o Olhar Sacro</h2>
+            <!-- Frase alterada conforme solicitado -->
+            <p class="text-sacro-escuro/70 dark:text-sacro-creme/80 max-w-md mx-auto text-sm md:text-base">Siga-nos em todas as redes sociais!</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-2xl mx-auto">
+            
+            <!-- Instagram -->
+            <a href="https://www.instagram.com/olhar.sacroo/" target="_blank" rel="noopener noreferrer" class="group bg-sacro-creme dark:bg-[#1C221E] border border-sacro-areia dark:border-sacro-verde/20 hover:border-sacro-marrom dark:hover:border-sacro-areia hover:bg-sacro-marrom dark:hover:bg-sacro-marrom hover:text-white p-6 rounded-2xl transition duration-300 flex flex-col items-center justify-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-sacro-areia dark:bg-[#121613] group-hover:bg-sacro-creme/20 flex items-center justify-center transition">
+                    <svg class="w-6 h-6 text-sacro-marrom dark:text-sacro-areia group-hover:text-sacro-creme transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                </div>
+                <span class="font-medium text-sm">Instagram</span>
+                <span class="text-xs text-sacro-marrom/70 dark:text-sacro-areia/80 group-hover:text-sacro-areia/80">@olhar.sacroo</span>
+            </a>
+
+            <!-- TikTok -->
+            <a href="https://www.tiktok.com/@olhar.sacro?_r=1&_t=ZS-97SACL5x6sH" target="_blank" rel="noopener noreferrer" class="group bg-sacro-creme dark:bg-[#1C221E] border border-sacro-areia dark:border-sacro-verde/20 hover:border-sacro-marrom dark:hover:border-sacro-areia hover:bg-sacro-marrom dark:hover:bg-sacro-marrom hover:text-white p-6 rounded-2xl transition duration-300 flex flex-col items-center justify-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-sacro-areia dark:bg-[#121613] group-hover:bg-sacro-creme/20 flex items-center justify-center transition">
+                    <svg class="w-6 h-6 text-sacro-marrom dark:text-sacro-areia group-hover:text-sacro-creme transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path></svg>
+                </div>
+                <span class="font-medium text-sm">TikTok</span>
+                <span class="text-xs text-sacro-marrom/70 dark:text-sacro-areia/80 group-hover:text-sacro-areia/80">@olhar.sacro</span>
+            </a>
+
+            <!-- Facebook -->
+            <a href="https://www.facebook.com/share/1E6aFaggVa/" target="_blank" rel="noopener noreferrer" class="group bg-sacro-creme dark:bg-[#1C221E] border border-sacro-areia dark:border-sacro-verde/20 hover:border-sacro-marrom dark:hover:border-sacro-areia hover:bg-sacro-marrom dark:hover:bg-sacro-marrom hover:text-white p-6 rounded-2xl transition duration-300 flex flex-col items-center justify-center gap-3">
+                <div class="w-12 h-12 rounded-full bg-sacro-areia dark:bg-[#121613] group-hover:bg-sacro-creme/20 flex items-center justify-center transition">
+                    <svg class="w-6 h-6 text-sacro-marrom dark:text-sacro-areia group-hover:text-sacro-creme transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+                </div>
+                <span class="font-medium text-sm">Facebook</span>
+                <span class="text-xs text-sacro-marrom/70 dark:text-sacro-areia/80 group-hover:text-sacro-areia/80">Olhar Sacro</span>
+            </a>
+
+        </div>
+    </section>
+
+    <!-- Rodapé -->
+    <footer class="bg-sacro-marrom text-sacro-creme/90 py-12 border-t border-sacro-marromClaro dark:border-sacro-verde/20 px-6">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="space-y-1 text-center md:text-left">
+                <h4 class="font-brand text-lg tracking-widest font-bold">OLHAR SACRO</h4>
+                <p class="text-xs text-sacro-areia/70">"Um olhar sagrado sobre o mundo"</p>
+            </div>
+            
+            <p class="text-xs text-sacro-areia/60 text-center">
+                &copy; 2026 Olhar Sacro. Todos os direitos reservados.<br>
+                Escrito com devoção por Kauã Rodrigues de Sousa Santos.
+            </p>
+        </div>
+    </footer>
+
+    <!-- MODAL DE LEITURA DE POESIA (Dinâmico e Minimalista) -->
+    <div id="poem-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-sacro-escuro/80 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+        <div id="modal-container" class="bg-sacro-verde text-sacro-creme w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl border border-sacro-verdeClaro transform scale-95 transition-transform duration-300 relative flex flex-col">
+            
+            <!-- Header do Modal -->
+            <div class="p-6 md:p-8 border-b border-sacro-verdeClaro/30 flex justify-between items-start">
+                <div>
+                    <span id="modal-date" class="text-xs text-sacro-areia/70 font-mono"></span>
+                    <h2 id="modal-title" class="font-serif text-2xl md:text-4xl font-semibold mt-2 text-glow"></h2>
+                </div>
+                <button onclick="closePoemModal()" class="text-sacro-areia/80 hover:text-white p-2 hover:bg-white/10 rounded-full transition">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Corpo / Texto do Modal -->
+            <div class="p-6 md:p-10 overflow-y-auto flex-1 space-y-6">
+                <div id="modal-content" class="font-serif text-base md:text-lg leading-relaxed whitespace-pre-wrap text-sacro-areia/95 tracking-wide max-w-xl mx-auto italic text-center">
+                    <!-- O texto entra dinamicamente via JS -->
+                </div>
+                
+                <!-- Linha decorativa final -->
+                <div class="flex items-center justify-center gap-3 pt-8 opacity-40">
+                    <span class="h-[1px] w-8 bg-sacro-areia"></span>
+                    <span class="font-brand text-xs">†</span>
+                    <span class="h-[1px] w-8 bg-sacro-areia"></span>
+                </div>
+            </div>
+
+            <!-- Rodapé do Modal -->
+            <div class="p-6 bg-sacro-escuro/30 text-center text-xs text-sacro-areia/60 rounded-b-3xl">
+                Escrito por Kauã Rodrigues de Sousa Santos
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript de Controle do Site -->
+    <script>
+        // Banco de dados local contendo as 5 poesias já cadastradas
+        const poesiasDatabase = {
+            'oracao': {
+                title: 'Oração',
+                date: '6 de junho de 2026',
+                content: `Perdoai as nossas ofensas, assim como nós perdoamos a quem nos tem ofendido... mas até quando irei me sentir culpado?
+
+Perdoei todos aqueles que pecaram contra mim; não guardo mágoas ou ódio em meu coração. Entrego-o a Ti, porque não consigo me perdoar, ó Pai. Sei que meus pecados foram perdoados, mas em meu peito ainda sinto um vazio frio, que me impede de sentir a sensação de salvação após o confessionário.
+
+Peço que me apresentes Teu verdadeiro amor de pai. Há quanto tempo não sinto a Tua presença?! Sei que estás comigo a todo momento, mas peço: transparece-Te para mim e faz-me sentir perdoado.
+
+E não nos deixeis cair em tentação, mas livrai-nos do mal.
+Amém.`
+            },
+            'retorno': {
+                title: 'Retorno',
+                date: '30 de maio de 2026',
+                content: `Em um rebanho de ovelhas, me senti acolhido pelo pastor; mas em meus pensamentos, a lã não faria falta. Sendo assim, decidi escapar com a intenção de desbravar horizontes que prometiam mais, mas logo notei que meu livre-arbítrio era infeliz e sem reciprocidade.
+
+Segui a vida sem esperanças, por não pensar que o pastor viria atrás de uma ovelha negra, tendo outras noventa e nove brancas como algodão. Minha lã nem era mais como as outras.
+
+E justamente por isso, Cristo, o pastor, veio atrás de mim. Acolhendo-me nos braços, questionou: "A promessa do pasto maior foi capaz de preencher o vazio do aprisco?"`
+            },
+            'o-que-nos-resta': {
+                title: 'O que nos resta',
+                date: '28 de maio de 2026',
+                content: `Pai, como te sentes vendo teus filhos em total perdição?
+Como te sentes vendo teus filhos em ignorância profunda?
+A eles, o conhecimento do mundo basta; mas como não compreendem a solução para o vazio que isso deixa no peito?
+
+A sociedade vive agoniada atrás de respostas onde elas não existem; para eles, não basta apenas não crer, precisam provar. Mas não notam que onde Cristo habita é onde pensadores não sabem explicar; não notam que onde Cristo age estudiosos não acham solução; não notam que Deus é tudo que precisamos...
+
+Até que Deus seja a única coisa que temos.`
+            },
+            'digno-cristo': {
+                title: 'Digno Cristo',
+                date: '26 de maio de 2026',
+                content: `Digno Cristo, se és tão bom, por qual motivo me abandonaste? Por que herdei a culpa? Por que estou sofrendo se és adorável e amável a todo instante? Por qual motivo sinto tanta distância de um mistério onipotente e presente?
+
+Digno Cristo, se és tão justo, por qual motivo me entregaste desafios para meu avanço? Por que herdei a graça da Cruz se meus pecados te pregaram? Por que estou sendo consolado se desperto perfurando teu sagrado coração? Por qual motivo deixaria 99 ovelhas para vir até mim?
+
+Digno Cristo, sinto que sou amado por ti intensamente a troco de lanças, mas se o que queres é minha alma, eu te entrego o meu nada, pois é tudo que tenho a lhe oferecer, Senhor.`
+            },
+            'o-doce-maria': {
+                title: 'Ó doce Maria!',
+                date: '22 de maio de 2026',
+                content: `Ó doce Maria! Corações se dispõem a tua consagração. Consagração tão grandiosa e tão bela, assim como a Virgem de ventre preenchido pela santidade eterna, que o transformaria na santa dos santos — o mais alto dos altos que uma raça tão insignificante poderia alcançar.
+
+Ó doce Maria! Tens a liberdade de rogar pela humanidade inteira pelos dons que recebeste e, graças a eles, foste assunta ao céu com vida.
+
+Ó doce Maria! Mestra e Rainha, falsas promessas criei, falsas promessas a ti ofereci... Mas meu coração permanece teu enquanto a escolha do meu caminho for a salvação. Desespero hei de sentir para me importar com teu amor, lágrimas hão de escorrer para eu me lembrar de que o teu coração puro é dedicado a mim, e o som de tua voz hei de ouvir para me apaixonar novamente.
+
+Ó doce Maria! Rogai por nós, gloriosa Virgem Aparecida e cheia de graça; bendito é o fruto de teu poderoso "sim", que estremece o céu e o inferno em distintos sentidos. E, enquanto minh'alma viver... Totus tuus, Maria!`
+            }
+        };
+
+        // ==========================================
+        // REPRODUTOR DE MÚSICA LOCAL (musica.MP3)
+        // ==========================================
+        let isMusicPlaying = false;
+        const musicBtn = document.getElementById('music-btn');
+        const musicIndicator = document.getElementById('music-indicator');
+        const musicText = document.getElementById('music-text');
+        let musicAudio = null;
+
+        musicBtn.addEventListener('click', function() {
+            if (!musicAudio) {
+                // Cria o objeto de áudio referenciando o arquivo local musica.MP3
+                musicAudio = new Audio('musica.MP3');
+                musicAudio.loop = true;
+            }
+
+            if (isMusicPlaying) {
+                musicAudio.pause();
+                isMusicPlaying = false;
+                musicIndicator.classList.add('hidden');
+                musicText.innerText = 'Música Ambiente';
+            } else {
+                musicAudio.play().then(() => {
+                    isMusicPlaying = true;
+                    musicIndicator.classList.remove('hidden');
+                    musicText.innerText = 'Silenciar';
+                }).catch(err => {
+                    console.log("Para reproduzir, coloque o arquivo musica.MP3 na mesma pasta do index.html", err);
+                    // Feedback visual temporário de aviso se o arquivo não estiver presente
+                    musicText.innerText = 'musica.MP3 não encontrado';
+                    setTimeout(() => {
+                        musicText.innerText = 'Música Ambiente';
+                    }, 3000);
+                });
+            }
+        });
+
+        // ==========================================
+        // CONTROLADORES DO MODAL DE LEITURA
+        // ==========================================
+        const modal = document.getElementById('poem-modal');
+        const modalContainer = document.getElementById('modal-container');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDate = document.getElementById('modal-date');
+        const modalContent = document.getElementById('modal-content');
+
+        function openPoemModal(key) {
+            const poem = poesiasDatabase[key];
+            if (!poem) return;
+
+            modalTitle.innerText = poem.title;
+            modalDate.innerText = poem.date;
+            modalContent.innerText = poem.content;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContainer.classList.remove('scale-95');
+                modalContainer.classList.add('scale-100');
+            }, 10);
+
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closePoemModal() {
+            modal.classList.add('opacity-0');
+            modalContainer.classList.remove('scale-100');
+            modalContainer.classList.add('scale-95');
+
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }, 300);
+        }
+
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closePoemModal();
+            }
+        });
+
+        // ==========================================
+        // SISTEMA SIMPLIFICADO DE BUSCA (Apenas barra de busca)
+        // ==========================================
+        const searchInput = document.getElementById('search-input');
+
+        function renderPoesias() {
+            const grid = document.getElementById('poesias-grid');
+            grid.innerHTML = '';
+            
+            const searchValue = searchInput.value.toLowerCase();
+
+            Object.keys(poesiasDatabase).forEach(key => {
+                const poem = poesiasDatabase[key];
+                
+                // Pesquisa nos títulos e nos conteúdos das poesias
+                const matchesSearch = poem.title.toLowerCase().includes(searchValue) || poem.content.toLowerCase().includes(searchValue);
+
+                if (matchesSearch) {
+                    const card = document.createElement('div');
+                    card.onclick = () => openPoemModal(key);
+                    card.className = "group cursor-pointer bg-sacro-creme dark:bg-[#1C221E] p-8 rounded-3xl border border-sacro-areia dark:border-sacro-verde/20 shadow-sm hover:shadow-xl hover:-translate-y-1 transition duration-300 flex flex-col justify-between h-80 relative overflow-hidden";
+                    card.innerHTML = `
+                        <div class="absolute top-0 inset-x-0 h-[4px] bg-sacro-marrom transform scale-x-0 group-hover:scale-x-100 transition duration-300"></div>
+                        <div>
+                            <div class="flex justify-between items-center text-xs text-sacro-marrom/60 dark:text-sacro-areia/60 mb-6">
+                                <span class="text-sacro-marrom dark:text-sacro-areia font-medium">${poem.date}</span>
+                                <span class="font-brand text-sacro-marrom dark:text-sacro-areia">†</span>
+                            </div>
+                            <h3 class="font-serif text-2xl font-bold text-sacro-verde dark:text-sacro-areia group-hover:text-sacro-marrom dark:group-hover:text-white transition duration-300">
+                                ${poem.title}
+                            </h3>
+                            <p class="text-sm text-sacro-escuro/60 dark:text-sacro-creme/75 mt-4 line-clamp-3 italic">
+                                "${poem.content.substring(0, 120)}..."
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs font-semibold text-sacro-marrom dark:text-sacro-areia group-hover:text-sacro-verde dark:group-hover:text-white group-hover:gap-4 transition-all">
+                            <span>Ler poesia completa</span>
+                            <span>&rarr;</span>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                }
+            });
+
+            if (grid.innerHTML === '') {
+                grid.innerHTML = `<div class="col-span-full py-12 text-center text-sm opacity-55 font-serif italic">Nenhuma poesia encontrada para esta busca...</div>`;
+            }
+        }
+
+        searchInput.addEventListener('input', renderPoesias);
+
+        // ==========================================
+        // CONTROLES DE ALTERNÂNCIA DE TEMA (Modo Claro/Escuro)
+        // ==========================================
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
+        const themeToggleLightIcon = document.getElementById('theme-toggle-light-icon');
+
+        function updateToggleIcons() {
+            if (document.documentElement.classList.contains('dark')) {
+                themeToggleLightIcon.classList.remove('hidden');
+                themeToggleDarkIcon.classList.add('hidden');
+            } else {
+                themeToggleLightIcon.classList.add('hidden');
+                themeToggleDarkIcon.classList.remove('hidden');
+            }
+        }
+
+        themeToggleBtn.addEventListener('click', function() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+            }
+            updateToggleIcons();
+        });
+
+        // ==========================================
+        // INICIALIZAÇÃO DO SISTEMA
+        // ==========================================
+        window.onload = function() {
+            updateToggleIcons();
+            renderPoesias();
+        };
+    </script>
+</body>
+</html>
